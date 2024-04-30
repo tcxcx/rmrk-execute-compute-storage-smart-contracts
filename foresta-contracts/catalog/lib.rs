@@ -1,16 +1,20 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 use ink::storage::Mapping;
 use openbrush::contracts::ownable::*;
+use openbrush::traits::Storage;
 use rmrk::types::{Part, ChildNft, PartType};
+use ink::prelude::vec::Vec;
 
-#[ink::contract]
+#[openbrush::implementation(Ownable)]
+#[openbrush::contract]
 pub mod catalog {
     use super::*;
 
     #[ink(storage)]
-    #[derive(Default)]
+    #[derive(Default, Storage)]
     pub struct Catalog {
+        #[storage_field]
         ownable: ownable::Data,
         catalog: Mapping<u64, Part>,
         next_part_id: u64,
@@ -31,7 +35,7 @@ pub mod catalog {
             let part_id = self.next_part_id;
             self.catalog.insert(part_id, &part);
             self.part_owners.insert(part_id, &Self::env().caller());
-            self.next_part_id += 1;
+            let _ = self.next_part_id.checked_add(1);
             Ok(part_id)
         }
 
@@ -67,19 +71,4 @@ pub mod catalog {
         }
     }
 
-    impl Ownable for Catalog {
-        fn owner(&self) -> Option<AccountId> {
-            self.ownable.owner.get()
-        }
-
-        fn transfer_ownership(&mut self, new_owner: Option<AccountId>) -> Result<(), OwnableError> {
-            let caller = Self::env().caller();
-            self.ownable._transfer_ownership(caller, new_owner)
-        }
-
-        fn renounce_ownership(&mut self) -> Result<(), OwnableError> {
-            let caller = Self::env().caller();
-            self.ownable._transfer_ownership(caller, None)
-        }
-    }
 }

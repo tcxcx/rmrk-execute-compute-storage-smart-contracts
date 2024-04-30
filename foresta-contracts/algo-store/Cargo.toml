@@ -1,14 +1,15 @@
 [package]
-name = "catalog"
+name = "algo-store"
 version = "0.1.0"
-authors = ["[CryptoPoeta] <[cryptopoeta@gmail.com]>"]
+authors = ["CryptoPoeta <cryptopoeta@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-ink = { version = "4.3.0", default-features = false }
-ink_env = { version = "4.3.0", default-features = false }
+ink = { version = "4.2.1", default-features = false }
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 scale-info = { version = "2.6", default-features = false, features = ["derive"], optional = true }
+catalog = { path = "../catalog", default-features = false }
+proxy = { path = "../proxy", default-features = false }
 rmrk = { version = "0.6.0", git="https://github.com/rmrk-team/rmrk-ink", default-features = false }
 openbrush = { tag = "4.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = ["psp34", "ownable", "reentrancy_guard"] }
 ink_storage = { version = "4.2.0", default-features = false }
@@ -23,12 +24,12 @@ path = "lib.rs"
 default = ["std"]
 std = [
     "ink/std",
-    "ink_env/std",
-    "openbrush/std",
-    "rmrk/std",
     "scale/std",
     "scale-info/std",
+    "catalog/std",
+    "proxy/std",
+    "rmrk/std",
+    "openbrush/std",
 ]
-
 ink-as-dependency = []
 e2e-tests = []

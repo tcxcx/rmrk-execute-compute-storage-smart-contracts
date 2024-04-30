@@ -19,7 +19,7 @@ mod phat_crypto {
     use pink::http_get;
     use alloc::{vec::Vec, string::String, format};
 
-    use crate::error::ApillonError;
+    use crate::error::PhalaError;
     use utils::utils::is_nft_owner;
     use utils::utils::hash_message;
 
@@ -32,7 +32,7 @@ mod phat_crypto {
 
     const SIGNATURE_VALID_TIME_IN_MS: u64 = 5 * 60 * 1000;
 
-    pub type CustomResult<T> = Result<T, ApillonError>;
+    pub type CustomResult<T> = Result<T, PhalaError>;
 
     type NftId = u8;
     type Cid = String;
@@ -73,7 +73,7 @@ mod phat_crypto {
         #[ink(message)]
         pub fn set_cid(&mut self, nft_id: u8, cid: String) -> CustomResult<String> {
             if !self.caller_is_contract_owner() {
-                return Err(ApillonError::NoPermission);
+                return Err(PhalaError::NoPermission);
             }
             self.cid_map.insert(nft_id, &cid);
 
@@ -87,10 +87,10 @@ mod phat_crypto {
                 Err(value) => return Err(value),
             };
             if self.owner_restriction {
-                return Err(ApillonError::NoPermission);
+                return Err(PhalaError::NoPermission);
             }
             if !is_nft_owner(signature, hashed_message, nft_id, self.contract_id.to_string(), self.rpc_api.to_string()) {
-                return Err(ApillonError::NotNftOwner);
+                return Err(PhalaError::NotNftOwner);
             }
             self.cid_map.insert(nft_id, &cid);
 
@@ -101,7 +101,7 @@ mod phat_crypto {
         pub fn get_cid(&self, nft_id: u8) -> CustomResult<String> {
             let cid = self.cid_map.get(nft_id);
             if cid.is_none() {
-                return Err(ApillonError::CidMissingFordNftId);
+                return Err(PhalaError::CidMissingFordNftId);
             }
             Ok(format!("{}", cid.unwrap()))
         }
@@ -109,7 +109,7 @@ mod phat_crypto {
         #[ink(message)]
         pub fn set_owner(&mut self, new_owner: AccountId) -> CustomResult<String> {
             if !self.caller_is_contract_owner() {
-                return Err(ApillonError::NoPermission);
+                return Err(PhalaError::NoPermission);
             }
             self.owner = new_owner;
 
@@ -135,13 +135,13 @@ mod phat_crypto {
                 Err(value) => return Err(value),
             };
             if !is_nft_owner(signature, hashed_message, nft_id, self.contract_id.to_string(), self.rpc_api.to_string()) {
-                return Err(ApillonError::NotNftOwner);
+                return Err(PhalaError::NotNftOwner);
             }
 
             // retrieve content from IPFS by CID
             let cid = self.cid_map.get(nft_id);
             if cid.is_none() {
-                return Err(ApillonError::CidMissingFordNftId);
+                return Err(PhalaError::CidMissingFordNftId);
             }
             let response = http_get!(format!("{}/{}", self.ipfs_endpoint.to_string(), cid.unwrap()));
             let response_body = match String::from_utf8(response.body) {
@@ -172,10 +172,10 @@ mod phat_crypto {
         Check that signature/timestamp was generated before block timestamp and it should be at most 5 minutes old.
         If Timestamp is valid returned hashed message consisting of hardcoded message and timestamp.
          */
-        fn check_timestamp_and_generate_message(unix_timestamp: u64) -> Result<[u8; 32], ApillonError> {
+        fn check_timestamp_and_generate_message(unix_timestamp: u64) -> Result<[u8; 32], PhalaError> {
             let block_timestamp = Self::env().block_timestamp();
             if unix_timestamp > block_timestamp || block_timestamp.abs_diff(unix_timestamp) >= SIGNATURE_VALID_TIME_IN_MS {
-                return Err(ApillonError::BadTimestamp);
+                return Err(PhalaError::BadTimestamp);
             }
             let timestamped_message = format!("APILLON_REQUEST_MSG: {}", unix_timestamp);
             let hashed_message = hash_message(&timestamped_message.to_string());
@@ -257,7 +257,7 @@ mod phat_crypto {
         fn get_cid_fails_if_cid_not_set_for_nft_id() {
             let contract = get_contract(true);
 
-            assert_eq!(contract.get_cid(2), Err(ApillonError::CidMissingFordNftId));
+            assert_eq!(contract.get_cid(2), Err(PhalaError::CidMissingFordNftId));
         }
 
         #[ink::test]
@@ -267,7 +267,7 @@ mod phat_crypto {
             _ = contract.set_owner(accounts.alice);
             set_caller(accounts.bob);
 
-            assert_eq!(contract.set_cid(TEST_NFT_ID, TEST_CID.to_string()), Err(ApillonError::NoPermission));
+            assert_eq!(contract.set_cid(TEST_NFT_ID, TEST_CID.to_string()), Err(PhalaError::NoPermission));
         }
 
         #[ink::test]
@@ -282,8 +282,8 @@ mod phat_crypto {
                 TEST_MESSAGE_SIGNATURE.to_string(),
             );
 
-            assert_eq!(result, Err(ApillonError::NotNftOwner));
-            assert_eq!(contract.get_cid(2), Err(ApillonError::CidMissingFordNftId));
+            assert_eq!(result, Err(PhalaError::NotNftOwner));
+            assert_eq!(contract.get_cid(2), Err(PhalaError::CidMissingFordNftId));
         }
 
         #[ink::test]
@@ -317,7 +317,7 @@ mod phat_crypto {
             let accounts = test_accounts();
             set_caller(accounts.bob);
 
-            assert_eq!(contract.set_owner(accounts.alice), Err(ApillonError::NoPermission));
+            assert_eq!(contract.set_owner(accounts.alice), Err(PhalaError::NoPermission));
         }
 
         // ENCRYPT CONTENT TESTS
@@ -362,7 +362,7 @@ mod phat_crypto {
                 TEST_MESSAGE_SIGNATURE.to_string(),
             );
 
-            assert_eq!(result, Err(ApillonError::BadTimestamp));
+            assert_eq!(result, Err(PhalaError::BadTimestamp));
         }
 
         #[ink::test]
@@ -378,7 +378,7 @@ mod phat_crypto {
                 TEST_MESSAGE_SIGNATURE.to_string(),
             );
 
-            assert_eq!(result, Err(ApillonError::BadTimestamp));
+            assert_eq!(result, Err(PhalaError::BadTimestamp));
         }
 
         #[ink::test]
@@ -396,7 +396,7 @@ mod phat_crypto {
                 fake_signature.to_string(),
             );
 
-            assert_eq!(result, Err(ApillonError::NotNftOwner));
+            assert_eq!(result, Err(PhalaError::NotNftOwner));
         }
 
         #[ink::test]
@@ -412,7 +412,7 @@ mod phat_crypto {
                 TEST_MESSAGE_SIGNATURE.to_string(),
             );
 
-            assert_eq!(result, Err(ApillonError::CidMissingFordNftId));
+            assert_eq!(result, Err(PhalaError::CidMissingFordNftId));
         }
     }
 }

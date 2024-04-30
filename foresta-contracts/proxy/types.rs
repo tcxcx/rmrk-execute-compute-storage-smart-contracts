@@ -1,20 +1,19 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
 use ink::storage::Mapping;
 use openbrush::{
     contracts::{
-        access_control::*,
-        ownable::*,
-        psp34::*,
-        reentrancy_guard::*,
+        access_control::AccessControlError, ownable::OwnableError, psp34::PSP34Error,
+        reentrancy_guard::ReentrancyGuardError,
     },
-    modifiers,
-    traits::{AccountId, Balance, Storage, String},
+    traits::{AccountId, Balance},
 };
-use rmrk::storage::catalog_external::Catalog;
+use rmrk::errors::Error as RmrkError;
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
 #[derive(Default, Debug)]
-#[openbrush::upgradeable_storage(STORAGE_KEY)]
+#[openbrush::storage(STORAGE_KEY)]
 pub struct Data {
     pub rmrk_contract: Option<AccountId>,
     pub catalog_contract: Option<AccountId>,
@@ -30,9 +29,15 @@ pub enum ProxyError {
     IPFSError,
     OwnableError(OwnableError),
     SchrodingerError,
+    MintingError,
     PSP34Error(PSP34Error),
-    ReentrancyGuardError(ReentrancyGuardError),
-    RmrkError(rmrk::errors::Error),
+    ReentrancyError(ReentrancyGuardError),
+    RmrkError(RmrkError),
     NoParentId,
     InvalidExecutionNFT,
 }
+
+// AlgorithmNFT and ExecutionNFT types would be defined here
+pub type AlgorithmNFT = psp34::Data<psp34::app::Data>;
+pub type ExecutionNFT = psp34::Data<psp34::app::Data>;
+pub type Id = psp34::Id;
