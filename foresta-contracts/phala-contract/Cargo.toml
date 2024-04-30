@@ -1,5 +1,5 @@
 [package]
-name = "phala-contract"
+name = "schrödinger-contract"
 version = "0.1.0"
 authors = ["CryptoPoeta <cryptopoeta@gmail.com>"]
 edition = "2021"
@@ -38,7 +38,7 @@ ink_e2e = "4.0.1"
 pink-extension-runtime = "0.4"
 
 [lib]
-path = "src/lib.rs"
+path = "lib.rs"
 
 
 [features]

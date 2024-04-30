@@ -1,3 +1,5 @@
+// This contract manages metadata and content identifiers (CIDs) related to algorithms stored as NFTs. 
+// It includes ownership checks, which is crucial for managing access rights.
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use crate::error::AlgoExecuteError;
@@ -52,6 +54,16 @@ pub mod algorithm_nft {
             self.algorithm_cid.insert(&token_id, &cid);
             Ok(())
         }
+        
+        #[ink(message)]
+        pub fn get_metadata(&self, token_id: Id) -> Option<String> {
+            self.metadata.get(&token_id)
+        }
+
+        #[ink(message)]
+        pub fn get_algorithm_cid(&self, token_id: Id) -> Option<String> {
+            self.algorithm_cid.get(&token_id)
+        }
 
         fn ensure_owner(&mut self) -> Result<(), AlgoExecuteError> {
             let owner = self.ownable.owner.get().ok_or(AlgoExecuteError::NotAuthorized)?;
@@ -60,6 +72,10 @@ pub mod algorithm_nft {
             } else {
                 Err(AlgoExecuteError::NotAuthorized)
             }
+        }
+        
+        pub fn fetch_algorithm_data(&self, algorithm_id: Id) -> Result<String, AlgoExecuteError> {
+            self.algorithm_cid.get(&algorithm_id).ok_or(AlgoExecuteError::DataNotFound)
         }
     }
 }

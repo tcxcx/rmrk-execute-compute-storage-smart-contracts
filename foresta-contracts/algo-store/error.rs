@@ -8,6 +8,7 @@ pub enum AlgoExecuteError {
     NotAuthorized,
     NotFound,
     UnexpectedError,
+    DataNotFound,
     DependencyError(String),
 }
 

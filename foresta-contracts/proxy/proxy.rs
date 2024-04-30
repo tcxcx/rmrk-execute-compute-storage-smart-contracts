@@ -1,3 +1,6 @@
+// Manages the mapping of NFT IDs to CIDs, essential for resolving content linked to NFTs.
+
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;

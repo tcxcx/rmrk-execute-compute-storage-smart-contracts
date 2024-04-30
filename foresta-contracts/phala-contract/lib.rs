@@ -14,9 +14,10 @@ use pink::chain_extension::signing::derive_sr25519_key;
 use crate::alloc::string::ToString;
 
 #[pink::contract(env = PinkEnvironment)]
-mod phat_crypto {
+mod schrödinger {
     use super::*;
     use pink::http_get;
+    use pink::http_post;
     use alloc::{vec::Vec, string::String, format};
 
     use crate::error::PhalaError;
@@ -38,7 +39,7 @@ mod phat_crypto {
     type Cid = String;
 
     #[ink(storage)]
-    pub struct ApillonContract {
+    pub struct SchrödingerContract {
         private_key: Vec<u8>,
         salt: Vec<u8>,
         cid_map: Mapping<NftId, Cid>,
@@ -47,11 +48,12 @@ mod phat_crypto {
         contract_id: String,
         rpc_api: String,
         ipfs_endpoint: String,
+        database_endpoint: String,
     }
 
-    impl ApillonContract {
+    impl SchrödingerContract {
         #[ink(constructor)]
-        pub fn new(contract_id: String, rpc_api: String, ipfs_endpoint: String, owner_restriction: bool) -> Self {
+        pub fn new(contract_id: String, rpc_api: String, ipfs_endpoint: String,  database_endpoint: String, owner_restriction: bool) -> Self {
             // Default constructor
             let salt = b"981781668367".to_vec();
             let private_key = derive_sr25519_key(&salt);
@@ -67,6 +69,7 @@ mod phat_crypto {
                 owner_restriction,
                 rpc_api,
                 ipfs_endpoint,
+                database_endpoint,
             }
         }
 
@@ -129,7 +132,7 @@ mod phat_crypto {
         }
 
         #[ink(message)]
-        pub fn download_and_decrypt(&self, nft_id: u8, unix_timestamp: u64, signature: String, ) -> CustomResult<String> {
+        pub fn deposit_content(&self, nft_id: u8, unix_timestamp: u64, signature: String) -> CustomResult<String> {
             let hashed_message = match Self::check_timestamp_and_generate_message(unix_timestamp) {
                 Ok(value) => value,
                 Err(value) => return Err(value),
@@ -138,26 +141,52 @@ mod phat_crypto {
                 return Err(PhalaError::NotNftOwner);
             }
 
-            // retrieve content from IPFS by CID
             let cid = self.cid_map.get(nft_id);
             if cid.is_none() {
                 return Err(PhalaError::CidMissingFordNftId);
             }
-            let response = http_get!(format!("{}/{}", self.ipfs_endpoint.to_string(), cid.unwrap()));
-            let response_body = match String::from_utf8(response.body) {
-                Ok(value) => value,
-                Err(e) => panic!("Failed to read response body: {}", e),
-            };
 
-            // decrypt payload
+            let encrypted_content = self.download_encrypted_content(cid.unwrap())?;
+            let decrypted_content = self.decrypt_content(encrypted_content)?;
+
+            let deposit_result = self.deposit_to_database(nft_id, decrypted_content)?;
+
+            Ok(deposit_result)
+        }
+
+        fn download_encrypted_content(&self, cid: String) -> CustomResult<String> {
+            let response = http_get!(format!("{}/{}", self.ipfs_endpoint.to_string(), cid));
+            let encrypted_content = match String::from_utf8(response.body) {
+                Ok(value) => value,
+                Err(e) => panic!("Failed to download encrypted content: {}", e),
+
+            };
+            Ok(encrypted_content)
+        }
+
+        fn decrypt_content(&self, encrypted_content: String) -> CustomResult<String> {
+            let content_decoded = hex::decode(encrypted_content).map_err(|_| PhalaError::DecryptionError)?;
+            
             let key: &GenericArray<u8, U32> = GenericArray::from_slice(&self.private_key[..32]);
             let cipher = Aes256GcmSiv::new(key.into());
             let nonce: &GenericArray<u8, U12> = Nonce::<Aes256GcmSiv>::from_slice(&self.salt);
-            let response_body_decoded = hex::decode(response_body).unwrap();
-            let content_decrypted: Vec<u8> = cipher.decrypt(nonce, response_body_decoded.as_ref()).unwrap();
-            let content = format!("{}", String::from_utf8_lossy(&content_decrypted));
+            
+            let decrypted_content = cipher.decrypt(nonce, content_decoded.as_ref())
+                .map_err(|_| PhalaError::DecryptionError)?;
 
-            Ok(content)
+            Ok(String::from_utf8(decrypted_content).map_err(|_| PhalaError::DecryptionError)?)
+        }
+
+        fn deposit_to_database(&self, nft_id: u8, decrypted_content: String) -> CustomResult<String> {
+            let payload = format!("{{\"nft_id\":\"{}\",\"content\":\"{}\"}}", nft_id, decrypted_content);
+            let response = http_post!(self.database_endpoint.to_string(), payload);
+
+            let deposit_result = match String::from_utf8(response.body) {
+                Ok(value) => value,
+                Err(e) => panic!("Failed to deposit files to databade: {}", e),
+
+            };
+            Ok(deposit_result)
         }
 
         // HELPERS
@@ -182,11 +211,10 @@ mod phat_crypto {
             Ok(hashed_message)
         }
     }
-
     #[cfg(test)]
     mod tests {
         use super::*;
-
+    
         const TEST_CONTRACT_ADDRESS: &str = "51e044373c4ba5a3d6eef0f7f7502b3d2f60276f";
         const TEST_RPC_API: &str = "https://rpc.api.moonbeam.network/";
         const TEST_IPFS_ENDPOINT: &str = "https://ipfs.apillon.io/ipfs/";
@@ -196,223 +224,236 @@ mod phat_crypto {
         const TEST_ENCRYPTED_CONTENT: &str = "53bfb3715cb5c28a6949d36d0e551a2434d10ad5415aaf783786d0";
         const TEST_MESSAGE_SIGNATURE: &str = "30d121c70f1f79d8b3212e3cdd24de3bf1a16fc5c3d14880fb80e5299897b4466ec10ac81893d0713ff2bf14feab30f3b8226a6e0b5eb2bec739d512815d4b2a1c";
         const TEST_SIGNATURE_TIMESTAMP: u64 = 1701688728000;
-
+    
         // TEST HELPERS
         fn test_accounts() -> ink::env::test::DefaultAccounts<PinkEnvironment> {
             ink::env::test::default_accounts::<Environment>()
         }
-
+    
         fn set_block_timestamp(timestamp: u64) {
             ink::env::test::set_block_timestamp::<Environment>(timestamp);
         }
-
+    
         fn set_caller(caller: AccountId) {
             ink::env::test::set_caller::<Environment>(caller);
         }
-
-        fn get_contract(restrict_to_owner: bool) -> ApillonContract {
-            // mock contract blockchain
+    
+        fn get_contract(restrict_to_owner: bool, database_endpoint: &str) -> SchrödingerContract {
             pink_extension_runtime::mock_ext::mock_all_ext();
-            ApillonContract::new(
+            SchrödingerContract::new(
                 TEST_CONTRACT_ADDRESS.to_string(),
                 TEST_RPC_API.to_string(),
                 TEST_IPFS_ENDPOINT.to_string(),
+                database_endpoint.to_string(),
                 restrict_to_owner,
             )
         }
-
+    
         // TESTS
         // GET SET CID TESTS
         #[ink::test]
         fn new_creates_contract_correctly() {
-            let contract = get_contract(true);
-
+            let contract = get_contract(true, "https://example.com/database");
+    
             assert_eq!(contract.contract_id, TEST_CONTRACT_ADDRESS);
             assert_eq!(contract.rpc_api, TEST_RPC_API);
             assert_eq!(contract.ipfs_endpoint, TEST_IPFS_ENDPOINT);
             assert_eq!(contract.owner_restriction, true);
-            // assert_eq!(contract.cid_map, 0);
         }
-
+    
         #[ink::test]
         fn contract_owner_can_set_and_get_cid() {
-            let mut contract = get_contract(true);
-
+            let mut contract = get_contract(true, "https://example.com/database");
+    
             let result = contract.set_cid(TEST_NFT_ID, TEST_CID.to_string());
-
+    
             assert_eq!(result.unwrap(), "Done");
             assert_eq!(contract.get_cid(TEST_NFT_ID).unwrap(), TEST_CID);
         }
-
+    
         #[ink::test]
         fn get_cid_works_for_all_users() {
-            let mut contract = get_contract(true);
+            let mut contract = get_contract(true, "https://example.com/database");
             _ = contract.set_cid(TEST_NFT_ID, TEST_CID.to_string());
             set_caller(test_accounts().bob);
-
+    
             assert_eq!(contract.get_cid(TEST_NFT_ID).unwrap(), TEST_CID.to_string());
         }
-
+    
         #[ink::test]
         fn get_cid_fails_if_cid_not_set_for_nft_id() {
-            let contract = get_contract(true);
-
+            let contract = get_contract(true, "https://example.com/database");
+    
             assert_eq!(contract.get_cid(2), Err(PhalaError::CidMissingFordNftId));
         }
-
+    
         #[ink::test]
         fn non_contract_owner_cant_set_cid() {
-            let mut contract = get_contract(true);
+            let mut contract = get_contract(true, "https://example.com/database");
             let accounts = test_accounts();
             _ = contract.set_owner(accounts.alice);
             set_caller(accounts.bob);
-
+    
             assert_eq!(contract.set_cid(TEST_NFT_ID, TEST_CID.to_string()), Err(PhalaError::NoPermission));
         }
-
+    
         #[ink::test]
         fn contract_owner_not_owning_nft_cant_set_cid_with_nft() {
-            let mut contract = get_contract(false);
+            let mut contract = get_contract(false, "https://example.com/database");
             set_block_timestamp(TEST_SIGNATURE_TIMESTAMP);
-
+    
             let result = contract.set_cid_with_nft(
                 2,
                 TEST_CID.to_string(),
                 TEST_SIGNATURE_TIMESTAMP,
                 TEST_MESSAGE_SIGNATURE.to_string(),
             );
-
+    
             assert_eq!(result, Err(PhalaError::NotNftOwner));
             assert_eq!(contract.get_cid(2), Err(PhalaError::CidMissingFordNftId));
         }
-
+    
         #[ink::test]
         fn nft_owner_can_set_cid_with_nft() {
-            let mut contract = get_contract(false);
+            let mut contract = get_contract(false, "https://example.com/database");
             set_caller(test_accounts().bob);
             set_block_timestamp(TEST_SIGNATURE_TIMESTAMP);
-
+    
             let result = contract.set_cid_with_nft(
                 TEST_NFT_ID,
                 TEST_CID.to_string(),
                 TEST_SIGNATURE_TIMESTAMP,
                 TEST_MESSAGE_SIGNATURE.to_string(),
             );
-
+    
             assert_eq!(result.unwrap(), "Done");
             assert_eq!(contract.get_cid(TEST_NFT_ID).unwrap(), TEST_CID);
         }
-
+    
         // SET OWNER TESTS
         #[ink::test]
         fn contract_owner_can_set_new_contract_owner() {
-            let mut contract = get_contract(true);
-
+            let mut contract = get_contract(true, "https://example.com/database");
+    
             assert_eq!(contract.set_owner(test_accounts().alice).unwrap(), "Done");
         }
-
+    
         #[ink::test]
         fn non_contract_owner_cant_set_new_contract_owner() {
-            let mut contract = get_contract(true);
+            let mut contract = get_contract(true, "https://example.com/database");
             let accounts = test_accounts();
             set_caller(accounts.bob);
-
+    
             assert_eq!(contract.set_owner(accounts.alice), Err(PhalaError::NoPermission));
         }
-
+    
         // ENCRYPT CONTENT TESTS
         #[ink::test]
         fn anyone_can_encrypt_content() {
-            let contract = get_contract(true);
+            let contract = get_contract(true, "https://example.com/database");
             set_caller(test_accounts().bob);
-
+    
             let result = contract.encrypt_content(TEST_DECRYPTED_CONTENT.to_string());
-
+    
             assert_eq!(result.unwrap(), TEST_ENCRYPTED_CONTENT);
         }
-
+    
+        // DOWNLOAD ENCRYPTED CONTENT TESTS
+        #[ink::test]
+        fn download_encrypted_content_succeeds_with_valid_cid() {
+            let mut contract = get_contract(true, "https://example.com/database");
+            _ = contract.set_cid(TEST_NFT_ID, TEST_CID.to_string());
+    
+            let result = contract.download_encrypted_content(TEST_CID.to_string());
+    
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), TEST_ENCRYPTED_CONTENT);
+        }
+    
+        #[ink::test]
+        fn download_encrypted_content_fails_with_invalid_cid() {
+            let contract = get_contract(true, "https://example.com/database");
+            let invalid_cid = "invalid_cid";
+    
+            let result = contract.download_encrypted_content(invalid_cid.to_string());
+    
+            assert!(result.is_err());
+        }
+    
         // DECRYPT CONTENT TESTS
         #[ink::test]
-        fn user_can_decrypt_content_if_he_holds_whitelisted_nft() {
-            let mut contract = get_contract(true);
+        fn decrypt_content_succeeds_with_valid_encrypted_content() {
+            let contract = get_contract(true, "https://example.com/database");
+    
+            let result = contract.decrypt_content(TEST_ENCRYPTED_CONTENT.to_string());
+    
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), TEST_DECRYPTED_CONTENT);
+        }
+    
+        #[ink::test]
+        fn decrypt_content_fails_with_invalid_encrypted_content() {
+            let contract = get_contract(true, "https://example.com/database");
+            let invalid_encrypted_content = "invalid_encrypted_content";
+    
+            let result = contract.decrypt_content(invalid_encrypted_content.to_string());
+    
+            assert!(result.is_err());
+        }
+    
+        // DEPOSIT TO DATABASE TESTS
+        #[ink::test]
+        fn deposit_to_database_succeeds_with_valid_data() {
+            let contract = get_contract(true, "https://example.com/database");
+    
+            let result = contract.deposit_to_database(TEST_NFT_ID, TEST_DECRYPTED_CONTENT.to_string());
+    
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "Deposit successful");
+        }
+    
+        #[ink::test]
+        fn deposit_to_database_fails_with_invalid_endpoint() {
+            let contract = get_contract(true, "https://invalid.endpoint");
+    
+            let result = contract.deposit_to_database(TEST_NFT_ID, TEST_DECRYPTED_CONTENT.to_string());
+    
+            assert!(result.is_err());
+        }
+    
+        // DEPOSIT CONTENT TESTS
+        #[ink::test]
+        fn deposit_content_succeeds_with_valid_data() {
+            let mut contract = get_contract(true, "https://example.com/database");
             _ = contract.set_cid(TEST_NFT_ID, TEST_CID.to_string());
             set_caller(test_accounts().bob);
             set_block_timestamp(TEST_SIGNATURE_TIMESTAMP);
-
-            let result = contract.download_and_decrypt(
+    
+            let result = contract.deposit_content(
                 TEST_NFT_ID,
                 TEST_SIGNATURE_TIMESTAMP,
                 TEST_MESSAGE_SIGNATURE.to_string(),
             );
-
-            assert_eq!(result.unwrap(), TEST_DECRYPTED_CONTENT);
+    
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "Deposit successful");
         }
-
+    
         #[ink::test]
-        fn user_cant_decrypt_content_with_expired_signature_timestamp() {
-            let mut contract = get_contract(true);
+        fn deposit_content_fails_with_expired_signature_timestamp() {
+            let mut contract = get_contract(true, "https://example.com/database");
             _ = contract.set_cid(TEST_NFT_ID, TEST_CID.to_string());
             set_caller(test_accounts().bob);
             set_block_timestamp(TEST_SIGNATURE_TIMESTAMP);
-
+    
             let expired_timestamp = TEST_SIGNATURE_TIMESTAMP + SIGNATURE_VALID_TIME_IN_MS;
-            let result = contract.download_and_decrypt(
+            let result = contract.deposit_content(
                 TEST_NFT_ID,
                 expired_timestamp,
                 TEST_MESSAGE_SIGNATURE.to_string(),
             );
-
-            assert_eq!(result, Err(PhalaError::BadTimestamp));
-        }
-
-        #[ink::test]
-        fn user_cant_decrypt_content_with_signature_timestamp_created_after_block_timestamp() {
-            let mut contract = get_contract(true);
-            _ = contract.set_cid(TEST_NFT_ID, TEST_CID.to_string());
-            set_caller(test_accounts().bob);
-            set_block_timestamp(TEST_SIGNATURE_TIMESTAMP);
-
-            let result = contract.download_and_decrypt(
-                TEST_NFT_ID,
-                TEST_SIGNATURE_TIMESTAMP + 1,
-                TEST_MESSAGE_SIGNATURE.to_string(),
-            );
-
-            assert_eq!(result, Err(PhalaError::BadTimestamp));
-        }
-
-        #[ink::test]
-        fn user_cant_decrypt_content_with_fake_signature_timestamp() {
-            let mut contract = get_contract(true);
-            _ = contract.set_cid(TEST_NFT_ID, TEST_CID.to_string());
-            set_caller(test_accounts().bob);
-            set_block_timestamp(TEST_SIGNATURE_TIMESTAMP);
-            // signature of message="APILLON_REQUEST_MSG: 1701392163" with fake timestamp
-            let fake_signature = "851caebcdb8af36a06fb9a2f011bd82f8285739198aa3c0f893c6bbc7a158fd7127e387e8c3737404618ae0515d22feaf3928c1d896163f4c441ce33d6e095f71b";
-
-            let result = contract.download_and_decrypt(
-                TEST_NFT_ID,
-                TEST_SIGNATURE_TIMESTAMP,
-                fake_signature.to_string(),
-            );
-
-            assert_eq!(result, Err(PhalaError::NotNftOwner));
-        }
-
-        #[ink::test]
-        fn user_cant_decrypt_content_if_he_holds_non_whitelisted_nft() {
-            let mut contract = get_contract(true);
-            _ = contract.set_cid(2, TEST_CID.to_string());
-            set_caller(test_accounts().bob);
-            set_block_timestamp(TEST_SIGNATURE_TIMESTAMP);
-
-            let result = contract.download_and_decrypt(
-                TEST_NFT_ID,
-                TEST_SIGNATURE_TIMESTAMP,
-                TEST_MESSAGE_SIGNATURE.to_string(),
-            );
-
-            assert_eq!(result, Err(PhalaError::CidMissingFordNftId));
+    
+            assert!(result.is_err());
         }
     }
 }

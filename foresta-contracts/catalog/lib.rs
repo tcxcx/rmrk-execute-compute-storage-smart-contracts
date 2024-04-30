@@ -1,3 +1,7 @@
+// This module manages parts, their ownership, and nested children, which are central to your system's ability to create complex, 
+// nestable NFT structures.
+
+
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 use ink::storage::Mapping;

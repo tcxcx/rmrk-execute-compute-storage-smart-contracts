@@ -16,5 +16,8 @@ pub enum PhalaError {
     NoPermission,
     CidMissingFordNftId,
     BadTimestamp,
-    NotNftOwner
+    NotNftOwner,
+    DownloadError,
+    DecryptionError,
+    DatabaseDepositError,
 }
