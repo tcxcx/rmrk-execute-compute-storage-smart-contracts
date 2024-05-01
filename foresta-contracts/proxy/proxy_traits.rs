@@ -1,5 +1,3 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-
 use openbrush::{
     contracts::psp34::{
         Data as PSP34Data,

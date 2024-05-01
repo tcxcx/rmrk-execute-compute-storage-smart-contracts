@@ -10,7 +10,7 @@ pub enum AlgoExecuteError {
     UnexpectedError,
     InvalidExecutionNFT,
     UnauthorizedAccess,
-    DependencyError(String),
+    DependencyError,
 }
 
 impl From<OwnableError> for AlgoExecuteError {

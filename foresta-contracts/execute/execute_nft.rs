@@ -1,7 +1,5 @@
 // Handles the execution permissions associated with NFTs. This is critical for ensuring that only authorized users can execute the
 // algorithms associated with specific NFTs.
-#![cfg_attr(not(feature = "std"), no_std)]
-
 use crate::error::AlgoExecuteError;
 use ink::storage::Mapping;
 use openbrush::{

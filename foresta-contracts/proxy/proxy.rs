@@ -1,14 +1,11 @@
 // Manages the mapping of NFT IDs to CIDs, essential for resolving content linked to NFTs.
-
-
-#![cfg_attr(not(feature = "std"), no_std)]
-
 extern crate alloc;
 
 use ink::storage::Mapping;
 use ink::env::DefaultEnvironment;
 
 pub use scale::{Decode, Encode};
+use openbrush::traits::String;
 
 #[ink::contract(env = DefaultEnvironment)]
 pub mod rmrk_proxy {

@@ -1,7 +1,5 @@
 // This contract manages metadata and content identifiers (CIDs) related to algorithms stored as NFTs. 
 // It includes ownership checks, which is crucial for managing access rights.
-#![cfg_attr(not(feature = "std"), no_std, no_main)]
-
 use crate::error::AlgoExecuteError;
 use ink::storage::Mapping;
 use openbrush::{

@@ -9,7 +9,7 @@ pub enum AlgoExecuteError {
     NotFound,
     UnexpectedError,
     DataNotFound,
-    DependencyError(String),
+    DependencyError,
 }
 
 impl From<OwnableError> for AlgoExecuteError {
