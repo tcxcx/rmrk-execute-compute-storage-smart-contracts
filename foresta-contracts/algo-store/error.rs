@@ -10,6 +10,9 @@ pub enum AlgoExecuteError {
     UnexpectedError,
     DataNotFound,
     DependencyError,
+    ExecutionError,
+    AlgorithmCIDNotFound,
+    CrossContractCallFailed
 }
 
 impl From<OwnableError> for AlgoExecuteError {

@@ -7,12 +7,28 @@ edition = "2021"
 [dependencies]
 ink = { version = "4.2.1", default-features = false }
 
-scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
-scale-info = { version = "2.6", default-features = false, features = ["derive"], optional = true }
-catalog = { path = "../catalog", default-features = false }
-rmrk = { version = "0.6.0", git="https://github.com/rmrk-team/rmrk-ink", default-features = false }
-openbrush = { tag = "4.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = ["psp34", "ownable", "reentrancy_guard"] }
+scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
+    "derive",
+] }
+scale-info = { version = "2.6", default-features = false, features = [
+    "derive",
+], optional = true }
+algo_nft = { path = "../algo-store", default-features = false }
+execute_nft = { path = "../execute", default-features = false }
+schrodinger_contract = { path = "../phala-contract", default-features = false }
+openbrush = { tag = "4.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = [
+    "psp34",
+    "ownable",
+    "reentrancy_guard",
+] }
 ink_storage = { version = "4.2.0", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.96", default-features = false, features = [
+    "alloc",
+] }
+
+[patch.crates-io]
+serde = { git = "https://github.com/kvinwang/serde.git", branch = "pink" }
 
 [dev-dependencies]
 ink_e2e = "4.3.0"
@@ -25,11 +41,9 @@ default = ["std"]
 std = [
     "ink/std",
     "openbrush/std",
-    "rmrk/std",
-    "catalog/std",
     "scale/std",
     "scale-info/std",
+    "schrodinger_contract/std",
 ]
 ink-as-dependency = []
 e2e-tests = []
-

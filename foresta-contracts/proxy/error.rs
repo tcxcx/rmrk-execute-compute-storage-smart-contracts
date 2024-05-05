@@ -5,8 +5,8 @@ use scale::{Decode, Encode};
 #[derive(Encode, Decode, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum ProxyError {
-    NotAuthorized,
-    NotFound,
+    UnauthorizedAccess,
+    DataNotFound,
     UnexpectedError,
     OwnableError,
     PSP34Error,
@@ -17,4 +17,6 @@ pub enum ProxyError {
     InvalidExecutionNFT,
     BadMintValue,
     IPFSError,
+    DecryptionError,
+    ExecutionError
 }

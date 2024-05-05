@@ -2,9 +2,7 @@
 members = [
     "foresta-contracts/algo-store",
     "foresta-contracts/execute",
-    "foresta-contracts/proxy",
-    "foresta-contracts/catalog",
-    # "foresta-contracts/phala-contract",
+    "foresta-contracts/phala-contract",
 ]
 
 resolver = "2"

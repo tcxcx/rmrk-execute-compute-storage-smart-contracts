@@ -17,12 +17,11 @@ use scale::{
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct Data {
     pub rmrk_contract: Option<AccountId>,
-    pub catalog_contract: Option<AccountId>,
     pub schrodinger_contract: Option<AccountId>,
     pub mint_price: Balance,
     pub salt: u64,
 }
 
-pub type AlgorithmNFT = PSP34Data;
-pub type ExecutionNFT = PSP34Data;
+pub type AlgoNft = PSP34Data;
+pub type ExecuteNft = PSP34Data;
 pub type Id = PSP34Id;

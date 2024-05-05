@@ -16,7 +16,6 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[openbrush::storage(STORAGE_KEY)]
 pub struct Data {
     pub rmrk_contract: Option<AccountId>,
-    pub catalog_contract: Option<AccountId>,
     pub schrodinger_contract: Option<AccountId>,
     pub mint_price: Balance,
     pub salt: u64,
