@@ -269,7 +269,7 @@ mod schrodinger {
             }
             let deposit_result = match String::from_utf8(response.body) {
                 Ok(value) => value,
-                Err(e) => return Err(PhalaError::DatabaseError),
+                Err(_e) => return Err(PhalaError::DatabaseError),
             };
             Ok(deposit_result)
         }
@@ -689,14 +689,14 @@ mod schrodinger {
         #[ink::test]
         fn decrypt_and_execute_works() {
             let mut contract = setup();
-        
+
             let expected_cid = "QmExampleCid".to_string();
             let algo_id = TEST_NFT_ID;
             let exec_id = Id::U8(TEST_NFT_ID);
-        
+
             // Directly insert the expected_cid into the contract's map for testing
             contract.cid_map.insert(algo_id, &expected_cid);
-        
+
             // Mock the HTTP requests
             mock_http_request(|_| {
                 HttpResponse {
@@ -708,7 +708,7 @@ mod schrodinger {
                     reason_phrase: "OK".to_string(),
                 }
             });
-        
+
             let result = contract.decrypt_and_execute(Id::U8(algo_id), exec_id);
             assert!(result.is_ok());
         }

@@ -24,4 +24,6 @@ pub enum PhalaError {
     InvalidAlgoId,
     DatabaseError,
     NotExecuteNftOwner,
+    InvalidContractAbi,
+    SignatureRecoveryFailed,
 }
