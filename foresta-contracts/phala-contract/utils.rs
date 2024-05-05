@@ -11,7 +11,7 @@ use pink_web3::{
         pink_http::PinkHttp,
         resolve_ready
     },
-    api::{Eth, Namespace}
+    api::{Parity, Namespace}
 };
 
 

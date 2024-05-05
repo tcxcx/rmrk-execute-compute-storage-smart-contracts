@@ -23,4 +23,5 @@ pub enum PhalaError {
     CrossContractCallFailed,
     InvalidAlgoId,
     DatabaseError,
+    NotExecuteNftOwner,
 }

@@ -86,6 +86,7 @@ mod schrodinger {
         ipfs_endpoint: String,
         database_endpoint: String,
         algo_nft_contract: AccountId,
+        execute_nft_contract: AccountId,
     }
 
     impl SchrodingerContract {
@@ -97,6 +98,7 @@ mod schrodinger {
             database_endpoint: String,
             owner_restriction: bool,
             algo_nft_contract: AccountId,
+            execute_nft_contract: AccountId,
         ) -> Self {
             // Default constructor
             let salt = b"981781668367".to_vec();
@@ -115,6 +117,7 @@ mod schrodinger {
                 ipfs_endpoint,
                 database_endpoint,
                 algo_nft_contract,
+                execute_nft_contract,
             }
         }
 
@@ -137,6 +140,22 @@ mod schrodinger {
             signature: String,
         ) -> CustomResult<String> {
             let hashed_message = Self::check_timestamp_and_generate_message(unix_timestamp)?;
+
+            // Check NFT ownership using cross-contract call
+            let selector = ink::selector_bytes!("psp34::ownerOf");
+            let owner_result: Result<AccountId, PhalaError> = build_call::<DefaultEnvironment>()
+                .call(self.algo_nft_contract)
+                .exec_input(ExecutionInput::new(Selector::new(selector)).push_arg(Id::U8(nft_id)))
+                .returns::<AccountId>()
+                .try_invoke()
+                .map_err(|_| PhalaError::CrossContractCallFailed)
+                .and_then(|res| res.map_err(|_| PhalaError::CrossContractCallFailed));
+
+            let owner = owner_result?;
+
+            if owner != Self::env().caller() {
+                return Err(PhalaError::NotNftOwner);
+            }
 
             if !is_nft_owner(
                 signature,
@@ -271,7 +290,7 @@ mod schrodinger {
         }
 
         #[ink(message)]
-        pub fn decrypt_and_execute(&self, algo_id: Id) -> Result<(), PhalaError> {
+        pub fn decrypt_and_execute(&self, algo_id: Id, exec_id: Id) -> Result<(), PhalaError> {
             let selector = ink::selector_bytes!("fetch_algorithm_data");
             let cid_result: Result<String, PhalaError> = build_call::<DefaultEnvironment>()
                 .call(self.algo_nft_contract)
@@ -282,6 +301,25 @@ mod schrodinger {
                 .and_then(|res| res.map_err(|_| PhalaError::CrossContractCallFailed));
 
             let cid = cid_result?;
+
+            // Check execute NFT ownership
+            let is_owner_selector = ink::selector_bytes!("is_owner");
+            let is_owner_result: Result<bool, PhalaError> = build_call::<DefaultEnvironment>()
+                .call(self.execute_nft_contract)
+                .exec_input(
+                    ExecutionInput::new(Selector::new(is_owner_selector))
+                        .push_arg(exec_id)
+                        .push_arg(Self::env().caller()),
+                )
+                .returns::<bool>()
+                .try_invoke()
+                .map_err(|_| PhalaError::CrossContractCallFailed)
+                .and_then(|res| res.map_err(|_| PhalaError::CrossContractCallFailed));
+
+            if !is_owner_result? {
+                return Err(PhalaError::NotExecuteNftOwner);
+            }
+
             self.decrypt_and_execute_inner(algo_id, cid)
         }
 
@@ -365,9 +403,11 @@ mod schrodinger {
         fn default_headers() -> Vec<(String, String)> {
             vec![("Content-Type".to_string(), "application/json".to_string())]
         }
+
         fn get_contract(restrict_to_owner: bool, _database_endpoint: &str) -> SchrodingerContract {
             pink_extension_runtime::mock_ext::mock_all_ext();
             let algo_nft_contract = AccountId::from([0x01; 32]);
+            let execute_nft_contract = AccountId::from([0x02; 32]);
             SchrodingerContract::new(
                 TEST_CONTRACT_ADDRESS.to_string(),
                 TEST_RPC_API.to_string(),
@@ -375,6 +415,7 @@ mod schrodinger {
                 _database_endpoint.to_string(),
                 restrict_to_owner,
                 algo_nft_contract,
+                execute_nft_contract,
             )
         }
 
@@ -387,6 +428,7 @@ mod schrodinger {
                 TEST_DB_ENDPOINT.to_string(),
                 true,
                 AccountId::from([0x01; 32]),
+                AccountId::from([0x02; 32]),
             );
             set_block_timestamp(1701688728000);
             contract
@@ -647,13 +689,14 @@ mod schrodinger {
         #[ink::test]
         fn decrypt_and_execute_works() {
             let mut contract = setup();
-
+        
             let expected_cid = "QmExampleCid".to_string();
             let algo_id = TEST_NFT_ID;
-
+            let exec_id = Id::U8(TEST_NFT_ID);
+        
             // Directly insert the expected_cid into the contract's map for testing
             contract.cid_map.insert(algo_id, &expected_cid);
-
+        
             // Mock the HTTP requests
             mock_http_request(|_| {
                 HttpResponse {
@@ -665,8 +708,8 @@ mod schrodinger {
                     reason_phrase: "OK".to_string(),
                 }
             });
-
-            let result = contract.decrypt_and_execute(Id::U8(algo_id));
+        
+            let result = contract.decrypt_and_execute(Id::U8(algo_id), exec_id);
             assert!(result.is_ok());
         }
     }
