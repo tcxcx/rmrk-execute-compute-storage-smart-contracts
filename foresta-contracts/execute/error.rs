@@ -11,6 +11,7 @@ pub enum AlgoExecuteError {
     InvalidExecutionNFT,
     UnauthorizedAccess,
     DependencyError,
+    CrossContractCallFailed,
 }
 
 impl From<OwnableError> for AlgoExecuteError {

@@ -62,13 +62,17 @@ pub mod utils {
         hex::encode(address)
     }
 
+    // pub fn get_nft_owner_address(nft_id: u8, contract_id: String, rpc_api: String) -> String {
+    //     "0xabcd1234".to_string() // Mock address for testing
+    // }
+
     pub fn get_nft_owner_address(nft_id: u8, contract_id: String, rpc_api: String) -> String  {
         let default: Address =  Address::zero();
         let phttp = PinkHttp::new(rpc_api);
         let eth = Eth::new(phttp);
         let addr = String::from(contract_id).parse().unwrap();
 
-        let contract = Contract::from_json(eth, addr, include_bytes!("../abis/moonbase_nft_abi.json")).unwrap();
+        let contract = Contract::from_json(eth, addr, include_bytes!("../../target/ink/algo_nft/algo_nft.json")).unwrap();
 
         let query = "ownerOf";
         let address: Address = resolve_ready(contract.query(&query, (U256::from(nft_id), ), None, Options::default(), None)).unwrap_or(default);

@@ -20,4 +20,10 @@ pub enum PhalaError {
     DownloadError,
     DecryptionError,
     DatabaseDepositError,
+    CrossContractCallFailed,
+    InvalidAlgoId,
+    DatabaseError,
+    NotExecuteNftOwner,
+    InvalidContractAbi,
+    SignatureRecoveryFailed,
 }
